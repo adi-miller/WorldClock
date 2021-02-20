@@ -44,7 +44,6 @@ struct location {
   char* timezone;
   char* timezoneLabel;
   int utcOffsetInSeconds;
-  int dayOfYear;
 };
 
 /**
@@ -54,17 +53,17 @@ struct location {
  *   timezone - the timezone string based on the list in http://worldtimeapi.org/api/timezone. 
  *   timezoneLabel - a label to be displayed. Keep it short to fit your display. 
  *   utcOffsetInSeconds - keep -1 to have it refresh on init from worldtimeapi.org. 
- *   dayOfYear - will update automatically on init. 
  * 
  */
 location locations[] = {
-  { "Asia/Jerusalem", "Home", -1, 0 },
-  { "Africa/Nairobi", "Nairobi", -1, 0 },
-  { "Asia/Kolkata", "BLR", -1, 0 },
-  { "Europe/London", "London", -1, 0 },
-  { "PST8PDT", "Seattle", -1, 0 },
-  { "Asia/Hong_Kong", "Beijing", -1, 0 },
-  { "Europe/Berlin", "Munich" , -1, 0 }
+  { "Asia/Jerusalem", "Home", -1 },
+  { "Pacific/Chatham", "New Zealand", -1 },
+  { "Africa/Nairobi", "Nairobi", -1 },
+  { "Asia/Kolkata", "BLR", -1 },
+  { "Europe/London", "London", -1 },
+  { "PST8PDT", "Seattle", -1 },
+  { "Asia/Hong_Kong", "Beijing", -1 },
+  { "Europe/Berlin", "Munich" , -1 }
 };
 
 /**
@@ -83,7 +82,7 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200);
 HttpClient http = HttpClient(WiFiclient, "worldtimeapi.org", 80);
 unsigned long previousMillis = 0;
 int curLocation = 0;
-int localDayOfYear = 0;
+int localOffset = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -186,9 +185,8 @@ void initTimezone(int index) {
       int dst = int(jsonObj["dst_offset"]);
       locations[index].utcOffsetInSeconds = raw + dst;
       if (index == 0) {
-        localDayOfYear = int(jsonObj["day_of_year"]);
+        localOffset = raw + dst;
       }
-      locations[index].dayOfYear = int(jsonObj["day_of_year"]);
     } else {
       sprintf(displayBuffer, "Invalid response.");
     }
@@ -214,10 +212,14 @@ void loop() {
       initTimezone(curLocation);
     }
     if (locations[curLocation].utcOffsetInSeconds != -1) {
-      timeClient.setTimeOffset(locations[curLocation].utcOffsetInSeconds);
+      timeClient.setTimeOffset(localOffset);
       timeClient.update();
+      int localDay = timeClient.getEpochTime() / 86400L;
+      
+      timeClient.setTimeOffset(locations[curLocation].utcOffsetInSeconds);
       sprintf(displayBuffer, "%s %02d:%02d", locations[curLocation].timezoneLabel, timeClient.getHours(), timeClient.getMinutes()); 
-      int dayOffset = locations[curLocation].dayOfYear - localDayOfYear;
+
+      int dayOffset = (timeClient.getEpochTime() / 86400L) - localDay;
       if (dayOffset != 0) {
         sprintf(displayBuffer, "%s %s%d", displayBuffer,
           dayOffset > 0 ? "+" : "", dayOffset); 

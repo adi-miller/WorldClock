@@ -32,19 +32,18 @@ In the following example the clock will rotate between London and Kenya.
 
 * The first member is the timezone label in London. For the valid list of timezones see <http://worldtimeapi.org/api/timezone>.
 * The second member is the label to be display in the clock. It doesn't need to match the timezone label.
-* Keep the third of forth members `-1` and `0` respectively. They are automatically initialized and maintained.
+* Keep the third member `-1` (it is automatically initialized and maintained).
 
 ```c++
 struct location {
   char* timezone;
   char* timezoneLabel;
   int utcOffsetInSeconds;
-  int dayOfYear;
 };
 
 location locations[] = {
-  { "Europe/London", "London", -1, 0 },
-  { "Africa/Nairobi", "Nairobi", -1, 0 }
+  { "Europe/London", "London", -1 },
+  { "Africa/Nairobi", "Nairobi", -1 }
 };
 ```
 
