@@ -2,7 +2,7 @@
 
 WorldClock is a world clock display for MAX7219 or MAX7221 LED matrix display controllers using Arduino. It was built using D1 Mini Pro and 2 MAX7219 32x8 units connected together, however it can easily be adjusted to other controllers, other displays in other sizes.
 
-<center><img src="images/ezgif-2-7321fc9e29c7.gif" width="600"></center>
+![](images/ezgif-2-7321fc9e29c7.gif)
 
 ## Functionality
 
@@ -18,23 +18,34 @@ There is also (optional) support for MQTT for receiving messages which will then
 
 Please refer to any of the many tutorials that are available to assemble your setup based on the components you chose.
 
-<center><img src="images/wemos-and-max7219-_bb.png" width="400"></center>
+![](images/wemos-and-max7219-_bb.png)
 
 ## Configuration
 
 For configuration edit the sketch prior to uploading it to your controller.
 
-### Timezone
+### Locations
 
-To configure the list of timezones to be displayed, you will need to fill two arrays respectively `timezones[]` and `timezonesLabels[]`.
+To configure the list of locations to be displayed, you will need to initiliaze a new 'location' struct and add it to the `locations` array. See the example below.
 
-In the following example the clock will rotate between London and Kenya. The first member of the `timezones[]` array is the timezone label in London, and the first member in the `timezonesLabel[]` array is the label to be display in the clock. It doesn't need to match the timezone, as can be seen in the second member which is set to `Kenya`. 
+In the following example the clock will rotate between London and Kenya.
 
-For the valid list of timezones see http://worldtimeapi.org/api/timezone. 
+* The first member is the timezone label in London. For the valid list of timezones see <http://worldtimeapi.org/api/timezone>.
+* The second member is the label to be display in the clock. It doesn't need to match the timezone label.
+* Keep the third of forth members `-1` and `0` respectively. They are automatically initialized and maintained.
 
 ```c++
-char* timezones[] =      { "Europe/London", "Africa/Nairobi" };
-char* timezoneLabels[] = { "London",        "Kenya" };
+struct location {
+  char* timezone;
+  char* timezoneLabel;
+  int utcOffsetInSeconds;
+  int dayOfYear;
+};
+
+location locations[] = {
+  { "Europe/London", "London", -1, 0 },
+  { "Africa/Nairobi", "Nairobi", -1, 0 }
+};
 ```
 
 ### Wifi

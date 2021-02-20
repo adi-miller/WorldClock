@@ -11,7 +11,7 @@
 /**
  * MQTT is used to receive alert messages. To remove support comment out #define MQTT. 
  */
-//#define MQTT
+#define MQTT
 
 #ifdef MQTT
 #include <PubSubClient.h>
@@ -20,7 +20,7 @@
 /**
  * Device name for WiFi hostname and MQTT prefix. 
  */
-const char* deviceName = "pixelpanel";
+const char* deviceName = "worldclock";
 
 /**
  * Configuration for Max7219. Change according to your hardware. 
@@ -28,8 +28,8 @@ const char* deviceName = "pixelpanel";
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW     
 #define MAX_DEVICES 8
 #define CS_PIN      D4
-#define CLK_PIN     13
-#define DATA_PIN    11
+#define CLK_PIN     D5
+#define DATA_PIN    D7
 
 MD_Parola P = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES); // Hardware SPI
 //MD_Parola P = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES); // Software SPI
@@ -40,33 +40,31 @@ MD_Parola P = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES); // Hardware SPI
 int INTENSITY_NORM = 5;
 int INTENSITY_ALERT = 15;
 
-/**
- * List of timezones to be displayed. 
- * 
- * IMPORTANT: Both array must be of the same legnth!
- * 
- * timezones[] -      Lookup the relevant timezone from http://worldtimeapi.org/api/timezone. 
- *                    This can be a partial string, but make sure it's unique. 
- * timezoneLabels[] - The label to be displayed. Order must be same as in timezones[].         
- */
-char* timezones[] = { 
-  "Asia/Jerusalem", 
-  "Africa/Nairobi",
-  "Asia/Kolkata",
-  "Europe/London",
-  "PST8PDT",
-  "Asia/Hong_Kong",
-  "Europe/Berlin"
+struct location {
+  char* timezone;
+  char* timezoneLabel;
+  int utcOffsetInSeconds;
+  int dayOfYear;
 };
 
-char* timezoneLabels[] = { 
-  "Home", 
-  "Nairobi", 
-  "BLR", 
-  "London", 
-  "Bellevue", 
-  "China", 
-  "Munich" 
+/**
+ * Update the locations[] array for all the timezones to be displayed, based
+ * on the location struct. 
+ * 
+ *   timezone - the timezone string based on the list in http://worldtimeapi.org/api/timezone. 
+ *   timezoneLabel - a label to be displayed. Keep it short to fit your display. 
+ *   utcOffsetInSeconds - keep -1 to have it refresh on init from worldtimeapi.org. 
+ *   dayOfYear - will update automatically on init. 
+ * 
+ */
+location locations[] = {
+  { "Asia/Jerusalem", "Home", -1, 0 },
+  { "Africa/Nairobi", "Nairobi", -1, 0 },
+  { "Asia/Kolkata", "BLR", -1, 0 },
+  { "Europe/London", "London", -1, 0 },
+  { "PST8PDT", "Seattle", -1, 0 },
+  { "Asia/Hong_Kong", "Beijing", -1, 0 },
+  { "Europe/Berlin", "Munich" , -1, 0 }
 };
 
 /**
@@ -84,8 +82,8 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200);
 HttpClient http = HttpClient(WiFiclient, "worldtimeapi.org", 80);
 unsigned long previousMillis = 0;
-int utcOffsetInSeconds[ARRAY_SIZE(timezoneLabels)];
-int curTimezone = 0;
+int curLocation = 0;
+int localDayOfYear = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -117,7 +115,7 @@ void setup() {
 
   P.begin();
   P.setIntensity(3);
-  P.displayText(displayBuffer, PA_CENTER, 50, 2500, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+  P.displayText(displayBuffer, PA_CENTER, 50, 2500, PA_SCROLL_LEFT, PA_SCROLL_UP);
   
   initOffsets();
 
@@ -125,8 +123,8 @@ void setup() {
 }
 
 void initOffsets() {
-  for (int i = 0; i < ARRAY_SIZE(timezoneLabels); i++) {
-    utcOffsetInSeconds[i] = -1;
+  for (int i = 0; i < ARRAY_SIZE(locations); i++) {
+    locations[i].utcOffsetInSeconds = -1;
   }
 }
 
@@ -162,14 +160,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
   payloadStr[length] = 0;
   Serial.print(payloadStr); Serial.println("'");
   P.displayClear();
-  P.displayText(payloadStr, PA_CENTER, 50, 3500, PA_SCROLL_LEFT, PA_SCROLL_DOWN);
+  P.displayText(payloadStr, PA_CENTER, 50, 3500, PA_SCROLL_LEFT, PA_SCROLL_UP);
   P.setIntensity(INTENSITY_ALERT);
 }
 #endif
 
 void initTimezone(int index) {
   String httpCommand = "/api/timezone/";
-  httpCommand.concat(timezones[index]);
+  httpCommand.concat(locations[index].timezone);
   Serial.print("HTTP Command: "); Serial.println(httpCommand);
   http.get(httpCommand);
   int statusCode = http.responseStatusCode();
@@ -186,7 +184,11 @@ void initTimezone(int index) {
     } else if (jsonObj.hasOwnProperty("raw_offset")) {
       int raw = int(jsonObj["raw_offset"]);
       int dst = int(jsonObj["dst_offset"]);
-      utcOffsetInSeconds[index] = raw + dst;
+      locations[index].utcOffsetInSeconds = raw + dst;
+      if (index == 0) {
+        localDayOfYear = int(jsonObj["day_of_year"]);
+      }
+      locations[index].dayOfYear = int(jsonObj["day_of_year"]);
     } else {
       sprintf(displayBuffer, "Invalid response.");
     }
@@ -208,16 +210,21 @@ void loop() {
   }
    
   if(P.displayAnimate()) {
-    if (utcOffsetInSeconds[curTimezone] == -1) {
-      initTimezone(curTimezone);
+    if (locations[curLocation].utcOffsetInSeconds == -1) {
+      initTimezone(curLocation);
     }
-    if (utcOffsetInSeconds[curTimezone] != -1) {
-      timeClient.setTimeOffset(utcOffsetInSeconds[curTimezone]);
+    if (locations[curLocation].utcOffsetInSeconds != -1) {
+      timeClient.setTimeOffset(locations[curLocation].utcOffsetInSeconds);
       timeClient.update();
-      sprintf(displayBuffer, "%s %02d:%02d", timezoneLabels[curTimezone], timeClient.getHours(), timeClient.getMinutes()); 
+      sprintf(displayBuffer, "%s %02d:%02d", locations[curLocation].timezoneLabel, timeClient.getHours(), timeClient.getMinutes()); 
+      int dayOffset = locations[curLocation].dayOfYear - localDayOfYear;
+      if (dayOffset != 0) {
+        sprintf(displayBuffer, "%s %s%d", displayBuffer,
+          dayOffset > 0 ? "+" : "", dayOffset); 
+      }
     }
     P.setIntensity(INTENSITY_NORM);
-    P.displayText(displayBuffer, PA_CENTER, 50, 4500, PA_SCROLL_DOWN, PA_SCROLL_DOWN);
-    curTimezone = (curTimezone + 1) % ARRAY_SIZE(utcOffsetInSeconds);  
+    P.displayText(displayBuffer, PA_CENTER, 50, 4500, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+    curLocation = (curLocation + 1) % ARRAY_SIZE(locations);  
   }  
 }
