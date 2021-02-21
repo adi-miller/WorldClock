@@ -12,7 +12,7 @@ WorldClock will rotate between multiple timezones (configurable) and will displa
 
 ### MQTT Support
 
-There is also (optional) support for MQTT for receiving messages which will then be displayed once in higher brightness to atract attention.
+There is also (optional) support for MQTT for receiving messages, which will then be displayed in higher brightness to attract attention. If enabled, WorldClock will subscribe to topic `<devicename>/message/command` where `devicename` is the name of the device in the configuration (see below).
 
 ## Hardware and Assembly
 
@@ -26,12 +26,12 @@ For configuration edit the sketch prior to uploading it to your controller.
 
 ### Locations
 
-To configure the list of locations to be displayed, you will need to initiliaze a new 'location' struct and add it to the `locations` array. See the example below.
+To configure the list of locations to be displayed, you will need to initialize a new 'location' struct and add it to the `locations` array. See the example below.
 
 In the following example the clock will rotate between London and Kenya.
 
 * The first member is the timezone label in London. For the valid list of timezones see <http://worldtimeapi.org/api/timezone>.
-* The second member is the label to be display in the clock. It doesn't need to match the timezone label.
+* The second member is the label to be display in the clock. It does not need to match the timezone label.
 * Keep the third member `-1` (it is automatically initialized and maintained).
 
 ```c++
@@ -52,7 +52,7 @@ location locations[] = {
 The following configuration parameters are defined in `secrets.h`.
 
 * `SECRET_SSID` - the name of your WiFi SSID.
-* `SECRET_PASS` - the passowrd for you WiFi.
+* `SECRET_PASS` - the password for you WiFi.
 
 ### Other
 

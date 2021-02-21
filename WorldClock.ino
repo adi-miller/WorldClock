@@ -57,13 +57,12 @@ struct location {
  */
 location locations[] = {
   { "Asia/Jerusalem", "Home", -1 },
-  { "Pacific/Chatham", "New Zealand", -1 },
   { "Africa/Nairobi", "Nairobi", -1 },
   { "Asia/Kolkata", "BLR", -1 },
+  { "Europe/Berlin", "Munich" , -1 },
   { "Europe/London", "London", -1 },
   { "PST8PDT", "Seattle", -1 },
-  { "Asia/Hong_Kong", "Beijing", -1 },
-  { "Europe/Berlin", "Munich" , -1 }
+  { "Asia/Hong_Kong", "Beijing", -1 }
 };
 
 /**
@@ -73,7 +72,7 @@ location locations[] = {
 WiFiClient WiFiclient;
 const char* ssid = SECRET_SSID;
 const char* password = SECRET_PASS;
-char displayBuffer[40] = "Powered by worldtimeapi.org";
+char displayBuffer[120] = "Powered by worldtimeapi.org";
 #ifdef MQTT
 PubSubClient client(WiFiclient);
 #endif
@@ -83,6 +82,7 @@ HttpClient http = HttpClient(WiFiclient, "worldtimeapi.org", 80);
 unsigned long previousMillis = 0;
 int curLocation = 0;
 int localOffset = 0;
+int alertCount = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -154,13 +154,14 @@ void connectMqtt() {
 
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message received for topic '"); Serial.print(topic); Serial.print("'. Payload '");
-  char* payloadStr = (char*)malloc(length + 1);
-  memcpy(payloadStr, (const char *)payload, length);
-  payloadStr[length] = 0;
-  Serial.print(payloadStr); Serial.println("'");
+  int len = min(119, (int)length);
+  memcpy(displayBuffer, (const char *)payload, len);
+  displayBuffer[len] = 0;
+  Serial.print(displayBuffer); Serial.println("'");
+  alertCount = -1;
   P.displayClear();
-  P.displayText(payloadStr, PA_CENTER, 50, 3500, PA_SCROLL_LEFT, PA_SCROLL_UP);
   P.setIntensity(INTENSITY_ALERT);
+  Serial.println("Exit callback");
 }
 #endif
 
@@ -207,26 +208,34 @@ void loop() {
     previousMillis = millis();
   }
    
-  if(P.displayAnimate()) {
-    if (locations[curLocation].utcOffsetInSeconds == -1) {
-      initTimezone(curLocation);
-    }
-    if (locations[curLocation].utcOffsetInSeconds != -1) {
-      timeClient.setTimeOffset(localOffset);
-      timeClient.update();
-      int localDay = timeClient.getEpochTime() / 86400L;
-      
-      timeClient.setTimeOffset(locations[curLocation].utcOffsetInSeconds);
-      sprintf(displayBuffer, "%s %02d:%02d", locations[curLocation].timezoneLabel, timeClient.getHours(), timeClient.getMinutes()); 
-
-      int dayOffset = (timeClient.getEpochTime() / 86400L) - localDay;
-      if (dayOffset != 0) {
-        sprintf(displayBuffer, "%s %s%d", displayBuffer,
-          dayOffset > 0 ? "+" : "", dayOffset); 
+  if (alertCount == -1 || P.displayAnimate()) {
+    if (alertCount != 0) {
+      if (alertCount == -1) 
+        alertCount = 2;
+      else
+        alertCount--;
+      P.displayText(displayBuffer, PA_CENTER, 20, 2500, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+    } else {
+      if (locations[curLocation].utcOffsetInSeconds == -1) {
+        initTimezone(curLocation);
       }
+      if (locations[curLocation].utcOffsetInSeconds != -1) {
+        timeClient.setTimeOffset(localOffset);
+        timeClient.update();
+        int localDay = timeClient.getEpochTime() / 86400L;
+        
+        timeClient.setTimeOffset(locations[curLocation].utcOffsetInSeconds);
+        sprintf(displayBuffer, "%s %02d:%02d", locations[curLocation].timezoneLabel, timeClient.getHours(), timeClient.getMinutes()); 
+
+        int dayOffset = (timeClient.getEpochTime() / 86400L) - localDay;
+        if (dayOffset != 0) {
+          sprintf(displayBuffer, "%s %s%d", displayBuffer,
+            dayOffset > 0 ? "+" : "", dayOffset); 
+        }
+      }
+      P.setIntensity(INTENSITY_NORM);
+      P.displayText(displayBuffer, PA_CENTER, 70, 4500, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+      curLocation = (curLocation + 1) % ARRAY_SIZE(locations);  
     }
-    P.setIntensity(INTENSITY_NORM);
-    P.displayText(displayBuffer, PA_CENTER, 50, 4500, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
-    curLocation = (curLocation + 1) % ARRAY_SIZE(locations);  
   }  
 }
