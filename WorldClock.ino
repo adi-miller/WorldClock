@@ -69,17 +69,19 @@ location locations[] = {
  * Internal stuff from here on. No need to edit.
  */
  
-WiFiClient WiFiclient;
+WiFiClient WiFiClient1;
+WiFiClient WiFiClient2;
 const char* ssid = SECRET_SSID;
 const char* password = SECRET_PASS;
-char displayBuffer[120] = "Powered by worldtimeapi.org";
+char displayBuffer[60] = "Powered by worldtimeapi.org";
 #ifdef MQTT
-PubSubClient client(WiFiclient);
+PubSubClient client(WiFiClient1);
 #endif
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200);
-HttpClient http = HttpClient(WiFiclient, "worldtimeapi.org", 80);
+HttpClient http = HttpClient(WiFiClient2, "worldtimeapi.org", 80);
 unsigned long previousMillis = 0;
+
 int curLocation = 0;
 int localOffset = 0;
 int alertCount = 0;
@@ -157,11 +159,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
   int len = min(119, (int)length);
   memcpy(displayBuffer, (const char *)payload, len);
   displayBuffer[len] = 0;
-  Serial.print(displayBuffer); Serial.println("'");
+  Serial.print(displayBuffer); Serial.print("' (Length: "); Serial.print(length); Serial.println(" chars)");
   alertCount = -1;
   P.displayClear();
   P.setIntensity(INTENSITY_ALERT);
-  Serial.println("Exit callback");
 }
 #endif
 
@@ -199,6 +200,7 @@ void loop() {
   if (!client.connected()) {
     connectMqtt();
   }
+  delay(10);
   client.loop();
 #endif
 
@@ -234,7 +236,7 @@ void loop() {
         }
       }
       P.setIntensity(INTENSITY_NORM);
-      P.displayText(displayBuffer, PA_CENTER, 70, 4500, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+      P.displayText(displayBuffer, PA_CENTER, 70, 2500, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
       curLocation = (curLocation + 1) % ARRAY_SIZE(locations);  
     }
   }  

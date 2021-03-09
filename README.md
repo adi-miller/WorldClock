@@ -47,6 +47,8 @@ location locations[] = {
 };
 ```
 
+**Note** The first entry is considered your local time and all other locations are compared to that for the purpose of specifying +1 / -1 to indicate Tomorrow / Yesterday respectively.
+
 ### Wifi
 
 The following configuration parameters are defined in `secrets.h`.
